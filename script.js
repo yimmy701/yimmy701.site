@@ -7,7 +7,9 @@ const categories = [
         projects: [
             { title: 'Brand Identity System', description: 'Complete visual identity for a tech startup' },
             { title: 'Mobile App UI', description: 'Clean, modern interface design' },
-            { title: 'Design System', description: 'Comprehensive component library' }
+            { title: 'Design System', description: 'Comprehensive component library' },
+            { title: 'Website Redesign', description: 'Modern portfolio website' },
+            { title: 'Logo Design', description: 'Minimalist brand marks' }
         ]
     },
     { 
@@ -17,7 +19,8 @@ const categories = [
         projects: [
             { title: 'Web Application', description: 'Full-stack e-commerce platform' },
             { title: 'API Development', description: 'RESTful services with Node.js' },
-            { title: 'DevOps Pipeline', description: 'Automated deployment infrastructure' }
+            { title: 'DevOps Pipeline', description: 'Automated deployment infrastructure' },
+            { title: 'Database Optimization', description: 'Performance tuning' }
         ]
     },
     { 
@@ -36,8 +39,7 @@ const categories = [
         description: 'Musical performance and composition',
         projects: [
             { title: 'Original Compositions', description: 'Fingerstyle and classical pieces' },
-            { title: 'Cover Arrangements', description: 'Personal interpretations' },
-            { title: 'Live Performances', description: 'Concert and recording sessions' }
+            { title: 'Cover Arrangements', description: 'Personal interpretations' }
         ]
     },
     { 
@@ -57,7 +59,10 @@ const categories = [
         projects: [
             { title: 'Research Papers', description: 'Studies in cognitive psychology' },
             { title: 'User Research', description: 'Behavioral analysis for UX' },
-            { title: 'Workshop Facilitation', description: 'Teaching psychological concepts' }
+            { title: 'Workshop Facilitation', description: 'Teaching psychological concepts' },
+            { title: 'Case Studies', description: 'Applied psychology research' },
+            { title: 'Experiments', description: 'Behavioral studies' },
+            { title: 'Analysis Reports', description: 'Data-driven insights' }
         ]
     },
     { 
@@ -67,7 +72,8 @@ const categories = [
         projects: [
             { title: 'Image Classification', description: 'CNN-based visual recognition' },
             { title: 'NLP Pipeline', description: 'Text analysis and generation' },
-            { title: 'Predictive Models', description: 'Data-driven forecasting' }
+            { title: 'Predictive Models', description: 'Data-driven forecasting' },
+            { title: 'Neural Networks', description: 'Deep learning experiments' }
         ]
     },
     { 
@@ -86,8 +92,7 @@ const categories = [
         description: 'Cinematography and video production',
         projects: [
             { title: 'Short Films', description: 'Narrative storytelling projects' },
-            { title: 'Documentary Work', description: 'Real-world subject exploration' },
-            { title: 'Music Videos', description: 'Visual interpretation of sound' }
+            { title: 'Documentary Work', description: 'Real-world subject exploration' }
         ]
     },
     { 
@@ -107,7 +112,8 @@ const categories = [
         projects: [
             { title: 'Character Design', description: 'Original character illustrations' },
             { title: 'Concept Art', description: 'Visual development sketches' },
-            { title: 'Urban Sketching', description: 'On-location observational drawing' }
+            { title: 'Urban Sketching', description: 'On-location observational drawing' },
+            { title: 'Digital Illustrations', description: 'Tablet-based artwork' }
         ]
     }
 ];
@@ -119,69 +125,109 @@ let nodes = [];
 let connections = [];
 let hoveredNode = null;
 let animationFrame;
+let time = 0;
 
-// Resize canvas to fill window
+// Resize canvas to fill container
 function resizeCanvas() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
+    const container = canvas.parentElement;
+    canvas.width = container.clientWidth;
+    canvas.height = container.clientHeight;
     initializeMesh();
 }
 
-// Initialize node positions in a circular mesh
+// Calculate node radius based on project count
+function calculateRadius(projectCount) {
+    const minRadius = 45;
+    const maxRadius = 85;
+    const minProjects = Math.min(...categories.map(c => c.projects.length));
+    const maxProjects = Math.max(...categories.map(c => c.projects.length));
+    
+    if (maxProjects === minProjects) return (minRadius + maxRadius) / 2;
+    
+    const normalized = (projectCount - minProjects) / (maxProjects - minProjects);
+    return minRadius + (normalized * (maxRadius - minRadius));
+}
+
+// Initialize node positions in a more organic scattered pattern
 function initializeMesh() {
     nodes = [];
     connections = [];
     
     const centerX = canvas.width / 2;
     const centerY = canvas.height / 2;
-    const radius = Math.min(canvas.width, canvas.height) * 0.35;
+    const baseRadius = Math.min(canvas.width, canvas.height) * 0.3;
     
-    // Create nodes in a circular pattern
+    // Create nodes in a scattered circular pattern with some randomness
     categories.forEach((category, index) => {
         const angle = (index / categories.length) * Math.PI * 2 - Math.PI / 2;
-        const x = centerX + Math.cos(angle) * radius;
-        const y = centerY + Math.sin(angle) * radius;
+        
+        // Add some randomness to the position for organic feel
+        const radiusVariation = baseRadius * (0.8 + Math.random() * 0.4);
+        const angleVariation = angle + (Math.random() - 0.5) * 0.3;
+        
+        const x = centerX + Math.cos(angleVariation) * radiusVariation;
+        const y = centerY + Math.sin(angleVariation) * radiusVariation;
+        
+        const nodeRadius = calculateRadius(category.projects.length);
         
         nodes.push({
             x,
             y,
             baseX: x,
             baseY: y,
-            radius: 60,
+            radius: nodeRadius,
+            baseRadius: nodeRadius,
             category: category.name,
             color: category.color,
             description: category.description,
             projects: category.projects,
             hoverScale: 1,
-            targetHoverScale: 1
+            targetHoverScale: 1,
+            breathePhase: Math.random() * Math.PI * 2, // Random start phase for breathing
+            breatheSpeed: 0.8 + Math.random() * 0.4 // Slightly different speeds
         });
     });
     
-    // Create connections between nodes (connect each node to 2-3 nearby nodes)
+    // Create connections - connect each node to 2-3 nearby nodes
     nodes.forEach((node, i) => {
-        // Connect to next node
-        connections.push({
-            from: i,
-            to: (i + 1) % nodes.length,
-            opacity: 0.15
+        // Find distances to all other nodes
+        const distances = nodes.map((otherNode, j) => {
+            if (i === j) return { index: j, distance: Infinity };
+            const dx = node.x - otherNode.x;
+            const dy = node.y - otherNode.y;
+            return { index: j, distance: Math.sqrt(dx * dx + dy * dy) };
         });
         
-        // Connect to node 2 steps away for more interesting mesh
-        if (nodes.length > 4) {
-            connections.push({
-                from: i,
-                to: (i + 2) % nodes.length,
-                opacity: 0.1
-            });
+        // Sort by distance and connect to 2-3 nearest
+        distances.sort((a, b) => a.distance - b.distance);
+        const connectCount = 2 + Math.floor(Math.random() * 2); // 2 or 3 connections
+        
+        for (let k = 0; k < connectCount && k < distances.length; k++) {
+            const targetIndex = distances[k].index;
+            
+            // Check if connection already exists
+            const exists = connections.some(conn => 
+                (conn.from === i && conn.to === targetIndex) ||
+                (conn.from === targetIndex && conn.to === i)
+            );
+            
+            if (!exists) {
+                connections.push({
+                    from: i,
+                    to: targetIndex,
+                    baseOpacity: 0.12
+                });
+            }
         }
     });
 }
 
 // Draw the mesh
 function draw() {
+    time += 0.01;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // Draw connections
+    // Draw connections - ALWAYS VISIBLE as grey lines
     connections.forEach(conn => {
         const fromNode = nodes[conn.from];
         const toNode = nodes[conn.to];
@@ -194,31 +240,36 @@ function draw() {
         ctx.lineTo(toNode.x, toNode.y);
         
         if (isConnectedToHover) {
-            ctx.strokeStyle = `${hoveredNode.color}40`;
-            ctx.lineWidth = 2;
+            // Highlighted when connected to hovered node
+            ctx.strokeStyle = `${hoveredNode.color}60`;
+            ctx.lineWidth = 2.5;
         } else {
-            ctx.strokeStyle = `rgba(100, 100, 100, ${conn.opacity})`;
-            ctx.lineWidth = 1;
+            // Always visible grey lines
+            ctx.strokeStyle = `rgba(100, 100, 100, ${conn.baseOpacity})`;
+            ctx.lineWidth = 1.5;
         }
         
         ctx.stroke();
     });
     
-    // Draw nodes
+    // Draw nodes with breathing animation
     nodes.forEach(node => {
         // Update hover animation
         node.hoverScale += (node.targetHoverScale - node.hoverScale) * 0.1;
         
         const isHovered = node === hoveredNode;
-        const currentRadius = node.radius * node.hoverScale;
+        
+        // Breathing animation - subtle size change
+        const breatheAmount = Math.sin(time * node.breatheSpeed + node.breathePhase) * 0.03 + 1;
+        const currentRadius = node.baseRadius * node.hoverScale * breatheAmount;
         
         // Outer glow for hovered node
         if (isHovered) {
-            const gradient = ctx.createRadialGradient(node.x, node.y, currentRadius * 0.5, node.x, node.y, currentRadius * 1.5);
-            gradient.addColorStop(0, `${node.color}40`);
+            const gradient = ctx.createRadialGradient(node.x, node.y, currentRadius * 0.5, node.x, node.y, currentRadius * 1.8);
+            gradient.addColorStop(0, `${node.color}50`);
             gradient.addColorStop(1, 'transparent');
             ctx.fillStyle = gradient;
-            ctx.fillRect(node.x - currentRadius * 1.5, node.y - currentRadius * 1.5, currentRadius * 3, currentRadius * 3);
+            ctx.fillRect(node.x - currentRadius * 1.8, node.y - currentRadius * 1.8, currentRadius * 3.6, currentRadius * 3.6);
         }
         
         // Node circle
@@ -226,12 +277,12 @@ function draw() {
         ctx.arc(node.x, node.y, currentRadius, 0, Math.PI * 2);
         
         if (isHovered) {
-            ctx.fillStyle = `${node.color}30`;
+            ctx.fillStyle = `${node.color}35`;
             ctx.strokeStyle = node.color;
             ctx.lineWidth = 3;
         } else {
-            ctx.fillStyle = 'rgba(60, 60, 60, 0.3)';
-            ctx.strokeStyle = 'rgba(150, 150, 150, 0.5)';
+            ctx.fillStyle = 'rgba(60, 60, 60, 0.4)';
+            ctx.strokeStyle = 'rgba(120, 120, 120, 0.6)';
             ctx.lineWidth = 2;
         }
         
@@ -269,8 +320,20 @@ function updateTooltip(node, mouseX, mouseY) {
     const offsetX = 20;
     const offsetY = 20;
     
-    tooltip.style.left = mouseX + offsetX + 'px';
-    tooltip.style.top = mouseY + offsetY + 'px';
+    // Keep tooltip on screen
+    let left = mouseX + offsetX;
+    let top = mouseY + offsetY;
+    
+    // Adjust if tooltip would go off screen
+    if (left + 250 > window.innerWidth) {
+        left = mouseX - 250 - offsetX;
+    }
+    if (top + 100 > window.innerHeight) {
+        top = mouseY - 100 - offsetY;
+    }
+    
+    tooltip.style.left = left + 'px';
+    tooltip.style.top = top + 'px';
     tooltip.classList.add('visible');
 }
 
@@ -290,10 +353,10 @@ canvas.addEventListener('mousemove', (e) => {
     nodes.forEach(node => {
         const distance = Math.sqrt((mouseX - node.x) ** 2 + (mouseY - node.y) ** 2);
         
-        if (distance < node.radius) {
+        if (distance < node.radius * 1.1) {
             if (hoveredNode !== node) {
                 hoveredNode = node;
-                node.targetHoverScale = 1.15;
+                node.targetHoverScale = 1.2;
                 canvas.style.cursor = 'pointer';
                 updateTooltip(node, e.clientX, e.clientY);
             }
